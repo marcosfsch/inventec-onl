@@ -1,1 +1,24 @@
-!include $ONL_TEMPLATES/platform-modules.yml VENDOR=inventec BASENAME=x86-64-inventec-d10064 ARCH=amd64 KERNELS="onl-kernel-4.14-lts-x86-64-all:amd64"
+############################################################
+#
+# PKG template for all platform module packages
+#
+############################################################
+prerequisites:
+  packages:
+    - onl-kernel-4.14-lts-x86-64-all:amd64
+    - onl-vendor-inventec-modules:amd64
+
+packages:
+  - name: onl-platform-modules-x86-64-inventec-d10064
+    version: 1.0.0
+    arch: amd64
+    copyright: Copyright 2013, 2014, 2015 Big Switch Networks
+    maintainer: support@bigswitch.com
+    support: opennetworklinux@googlegroups.com
+    summary: ONL Platform Modules Package for the x86-64-inventec-d10064
+    depends: onl-vendor-inventec-modules
+
+    files:
+      builds/lib: /lib
+
+    changelog: Changes

@@ -14,6 +14,8 @@
 #define ONLP_NODE_MAX_INT_LEN	(8)
 #define ONLP_NODE_MAX_PATH_LEN	(64)
 
+#define INV_PLATFORM_NAME       "d5052"
+
 #define INV_CPLD_COUNT		(1)
 #define INV_CPLD_PREFIX		"/sys/bus/i2c/devices/1-0055/"
 #define INV_PSOC_PREFIX		"/sys/bus/i2c/devices/1-0066/"
@@ -61,18 +63,32 @@ enum onlp_fan_id {
     FAN_1_ON_PSU2,
     FAN_MAX
 };
-#define CHASSIS_FAN_COUNT	(8)
+#define CHASSIS_FAN_COUNT	(4)
 
 enum onlp_led_id {
     LED_RESERVED = 0,
+    LED_STK,
+    LED_FAN,
+    LED_PWR,
     LED_SYS,
     LED_FAN1,
     LED_FAN2,
-    LED_FAN3,
-    LED_FAN4,
     LED_MAX
 };
-#define CHASSIS_LED_COUNT	(1)
+#define CHASSIS_LED_COUNT	(4)
+
+/*
+ * struct cpld_led_map_s must be same as it in inv_platform.h
+ */
+typedef struct cpld_led_map_s {
+        char    *name;
+        int     bit_shift;
+        unsigned int    bit_mask;
+        unsigned int    led_off;
+        unsigned int    led_on;
+        unsigned int    led_blink;
+        unsigned int    led_blink_slow;
+} cpld_led_map_t;
 
 enum onlp_psu_id {
     PSU_RESERVED = 0,

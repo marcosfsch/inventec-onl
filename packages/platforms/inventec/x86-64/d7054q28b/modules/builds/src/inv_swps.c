@@ -42,13 +42,14 @@ static struct inv_port_layout_s *port_layout = NULL;
 
 static void swp_polling_worker(struct work_struct *work);
 static DECLARE_DELAYED_WORK(swp_polling, swp_polling_worker);
-
+static bool customEn = true;
 static int reset_i2c_topology(void);
+static void custom_transvrs_st_reinit(void);
 
-static union {
-    unsigned int eeprom_update_32[2];
-    unsigned char eeprom_update_8[8];
-} ueu_64;
+#ifdef INV_EEPROM_CACHE_SUPPORT
+#define EEPROM_UPDATE_PORT_NAME	(32)
+static unsigned char eeprom_update_port[EEPROM_UPDATE_PORT_NAME];
+#endif
 
 static int
 __swp_match(struct device *dev,
@@ -100,6 +101,7 @@ sscanf_2_int(const char *buf) {
     return -EBFONT;
 }
 
+#if 0
 static unsigned long long int
 sscanf_2_ullint(const char *buf, size_t count) {
 
@@ -139,7 +141,7 @@ sscanf_2_ullint(const char *buf, size_t count) {
     }
     return -EBFONT;
 }
-
+#endif
 
 static int
 sscanf_2_binary(const char *buf) {
@@ -269,17 +271,32 @@ _update_auto_config_2_trnasvr(void) {
     return retval;
 }
 
+#ifdef INV_EEPROM_CACHE_SUPPORT
 unsigned char *
 get_eeprom_update(void)
 {
-    return &ueu_64.eeprom_update_8[0];
+    return eeprom_update_port;
 }
 
 void
-set_eeprom_update(unsigned char value[8])
+set_eeprom_update(unsigned char value[EEPROM_UPDATE_PORT_NAME])
 {
-    memcpy(ueu_64.eeprom_update_8, value, 8);
+    snprintf(eeprom_update_port, EEPROM_UPDATE_PORT_NAME, "port%s updated\n", value);
 }
+#endif
+
+unsigned char
+get_swplog_enable(void)
+{
+    return swp_info_log_get_value();
+}
+
+void
+set_swplog_enable(unsigned char value)
+{
+    swp_info_log_set_value(value);
+}
+
 
 /* ========== R/W Functions module control attribute ==========
  */
@@ -319,14 +336,29 @@ show_attr_auto_config(struct device *dev_p,
 }
 
 static ssize_t
+show_attr_custom_en(struct device *dev_p,
+                      struct device_attribute *attr_p,
+                      char *buf_p){
+    
+    int data = 0;
+    data = (customEn ? 1: 0);
+    return snprintf(buf_p, PAGE_SIZE, "%d\n", data);
+}
+
+#ifdef INV_EEPROM_CACHE_SUPPORT
+static ssize_t
 show_attr_eeprom_update(struct device *dev_p,
 		struct device_attribute *attr_p,
 		char *buf_p){
-    return snprintf(buf_p, 20, "0x%02x%02x%02x%02x%02x%02x%02x%02x\n",
-		ueu_64.eeprom_update_8[7],ueu_64.eeprom_update_8[6],
-		ueu_64.eeprom_update_8[5],ueu_64.eeprom_update_8[4],
-		ueu_64.eeprom_update_8[3],ueu_64.eeprom_update_8[2],
-		ueu_64.eeprom_update_8[1],ueu_64.eeprom_update_8[0]);
+    return snprintf(buf_p, EEPROM_UPDATE_PORT_NAME, "%s\n", eeprom_update_port);
+}
+#endif
+
+static ssize_t
+show_attr_swplog_enable(struct device *dev_p,
+                      struct device_attribute *attr_p,
+                      char *buf_p){
+    return snprintf(buf_p, 3, "%d\n\n", get_swplog_enable());
 }
 
 
@@ -434,36 +466,66 @@ store_attr_auto_config(struct device *dev_p,
     _update_auto_config_2_trnasvr();
     return count;
 }
+static ssize_t
+store_attr_custom_en(struct device *dev_p,
+                       struct device_attribute *attr_p,
+                       const char *buf_p,
+                       size_t count){
 
+    int input_val = sscanf_2_int(buf_p);
+    bool pre_custom_en = customEn; 
+    if (input_val < 0){
+        return -EBFONT;
+    }
+    if ((input_val != 0) && (input_val != 1)) {
+        return -EBFONT;
+    }
+    
+    customEn = ((input_val == 1) ? true : false);
+    if (pre_custom_en != customEn) {
+ 	custom_transvrs_st_reinit();			
+    }    
+
+    return count;
+}
+
+#ifdef INV_EEPROM_CACHE_SUPPORT
 static ssize_t
 store_attr_eeprom_update(struct device *dev_p,
 			struct device_attribute *attr_p,
 			const char *buf_p,
 			size_t count) {
+    struct transvr_obj_s *transvr_obj;
+    char port[16] = { 0 };
+    int addr, value;
 
-    union {
-	unsigned long long int input_val_64;
-	unsigned int input_val_32[2];
-    } uiv;
-    int i;
-    uiv.input_val_64 = sscanf_2_ullint(buf_p, count);
-    if (uiv.input_val_64 == 0){
-	for (i = 0; i < 8; i++) {
-	    ueu_64.eeprom_update_8[i] = 0;
-	}
+    //SWPS_INFO("RYU: store_attr_eeprom_update(): %s, %d\n", buf_p, count);
+    sscanf(buf_p, "%s %d %d", port, &addr, &value);
+    //SWPS_INFO("RYU: store_attr_eeprom_update(%s): %d, %d\n", port,addr,value);
+    transvr_obj = _get_transvr_obj(port);
+    if (transvr_obj) {
+	*(transvr_obj->eeprom + addr) = (uint8_t)value;
+	//SWPS_INFO("RYU: store_attr_eeprom_update(%s): %d %d\n", port, addr, *(transvr_obj->eeprom + addr));
+    }
+
+    return count;
+}
+#endif
+
+static ssize_t
+store_attr_swplog_enable(struct device *dev_p,
+			struct device_attribute *attr_p,
+			const char *buf_p,
+			size_t count) {
+    if (buf_p[0] == '0') {
+	set_swplog_enable(0);
     }
     else
-    if (uiv.input_val_64 > 0) {
-	for (i = 0; i < 32; i++) {
-	    if (uiv.input_val_32[0] & 1<<i) {
-		ueu_64.eeprom_update_32[0] |= 1<<i;
-	    }
-	}
-	for (i = 0; i < 32; i++) {
-	    if (uiv.input_val_32[1] & 1<<i) {
-		ueu_64.eeprom_update_32[1] |= 1<<i;
-	    }
-	}
+    if (buf_p[0] == '1') {
+	set_swplog_enable(1);
+    }
+    else {
+	SWPS_INFO("%s: Invalid value: %s\n", __func__, buf_p);
     }
     return count;
 }
@@ -1139,6 +1201,7 @@ show_attr_auto_tx_disable(struct device *dev_p,
                                   buf_p);
 }
 
+#ifdef INV_EEPROM_CACHE_SUPPORT
 static ssize_t
 show_attr_eeprom(struct device *dev_p,
                           struct device_attribute *attr_p,
@@ -1152,6 +1215,7 @@ show_attr_eeprom(struct device *dev_p,
                                   tobj_p->get_eeprom,
                                   buf_p);
 }
+#endif
 
 /* ========== Store functions: transceiver (R/W) attribute ==========
  */
@@ -1662,7 +1726,11 @@ static DEVICE_ATTR(status,          S_IRUGO,         show_attr_status,          
 static DEVICE_ATTR(reset_i2c,       S_IWUSR,         NULL,                      store_attr_reset_i2c);
 static DEVICE_ATTR(reset_swps,      S_IWUSR,         NULL,                      store_attr_reset_swps);
 static DEVICE_ATTR(auto_config,     S_IRUGO|S_IWUSR, show_attr_auto_config,     store_attr_auto_config);
+#ifdef INV_EEPROM_CACHE_SUPPORT
 static DEVICE_ATTR(eeprom_update,   S_IRUGO|S_IWUSR, show_attr_eeprom_update,   store_attr_eeprom_update);
+#endif
+static DEVICE_ATTR(swplog_enable,   S_IRUGO|S_IWUSR, show_attr_swplog_enable,   store_attr_swplog_enable);
+static DEVICE_ATTR(custom_en,       S_IRUGO|S_IWUSR, show_attr_custom_en,     store_attr_custom_en);
 
 /* ========== Transceiver attribute: from eeprom ==========
  */
@@ -1699,7 +1767,9 @@ static DEVICE_ATTR(if_lane,         S_IRUGO,         show_attr_if_lane,         
 static DEVICE_ATTR(soft_rx_los,     S_IRUGO,         show_attr_soft_rx_los,     NULL);
 static DEVICE_ATTR(soft_tx_fault,   S_IRUGO,         show_attr_soft_tx_fault,   NULL);
 static DEVICE_ATTR(wavelength,      S_IRUGO,         show_attr_wavelength,      NULL);
+#ifdef INV_EEPROM_CACHE_SUPPORT
 static DEVICE_ATTR(eeprom,          S_IRUGO,         show_attr_eeprom,          NULL);
+#endif
 static DEVICE_ATTR(tx_eq,           S_IRUGO|S_IWUSR, show_attr_tx_eq,           store_attr_tx_eq);
 static DEVICE_ATTR(rx_am,           S_IRUGO|S_IWUSR, show_attr_rx_am,           store_attr_rx_am);
 static DEVICE_ATTR(rx_em,           S_IRUGO|S_IWUSR, show_attr_rx_em,           store_attr_rx_em);
@@ -2113,7 +2183,11 @@ check_transvr_obj_one(char *dev_name){
     }
     /* Check transceiver current status */
     lock_transvr_obj(tobj_p);
-    retval = tobj_p->check(tobj_p);
+    if (customEn) {
+        retval = tobj_p->custom_transvr_handler(tobj_p);
+    } else {
+        retval = tobj_p->check(tobj_p);
+    }
     unlock_transvr_obj(tobj_p);
     switch (retval) {
         case 0:
@@ -2181,7 +2255,24 @@ err_check_transvr_objs:
                __func__, dev_name);
     return -1;
 }
+static void custom_transvrs_st_reinit(void)
+{
 
+    char dev_name[32];
+    int port_id = 0;
+    int minor_curr = 0;
+    struct transvr_obj_s *tobj_p = NULL;
+    for (minor_curr=0; minor_curr<port_total; minor_curr++) {
+        /* Generate device name */
+        port_id = port_layout[minor_curr].port_id;
+        memset(dev_name, 0, sizeof(dev_name));
+        snprintf(dev_name, sizeof(dev_name), "%s%d", SWP_DEV_PORT, port_id);
+        /* Handle current status */
+	tobj_p = _get_transvr_obj(dev_name);
+        custom_st_reinit(tobj_p);
+    }
+
+}
 
 static void
 swp_polling_worker(struct work_struct *work){
@@ -2370,10 +2461,12 @@ register_transvr_sfp_attr(struct device *device_p){
         err_attr = "dev_attr_soft_rs1";
         goto err_transvr_sfp_attr;
     }
+#ifdef INV_EEPROM_CACHE_SUPPORT
     if (device_create_file(device_p, &dev_attr_eeprom) < 0) {
         err_attr = "dev_attr_eeprom";
         goto err_transvr_sfp_attr;
     }
+#endif
     return 0;
 
 err_transvr_sfp_attr:
@@ -2415,10 +2508,12 @@ register_transvr_qsfp_attr(struct device *device_p){
         err_attr = "soft_tx_fault";
         goto err_transvr_qsfp_attr;
     }
+#ifdef INV_EEPROM_CACHE_SUPPORT
     if (device_create_file(device_p, &dev_attr_eeprom) < 0) {
         err_attr = "dev_attr_eeprom";
         goto err_transvr_qsfp_attr;
     }
+#endif
     return 0;
 
 err_transvr_qsfp_attr:
@@ -2603,9 +2698,19 @@ register_modctl_attr(struct device *device_p){
         err_msg = "dev_attr_auto_config";
         goto err_reg_modctl_attr;
     }
+#ifdef INV_EEPROM_CACHE_SUPPORT
     if (device_create_file(device_p, &dev_attr_eeprom_update) < 0) {
 	err_msg = "dev_attr_eeprom_update";
 	goto err_reg_modctl_attr;
+    }
+#endif
+    if (device_create_file(device_p, &dev_attr_swplog_enable) < 0) {
+	err_msg = "dev_attr_swplog_enable";
+	goto err_reg_modctl_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_custom_en) < 0) {
+        err_msg = "dev_attr_custom_en";
+        goto err_reg_modctl_attr;
     }
     return 0;
 
@@ -2972,6 +3077,9 @@ err_init_swps_common_1:
     return -1;
 }
 
+/*
+ * defined in transceiver.c
+ */
 
 static int __init
 swp_module_init(void){
@@ -3001,6 +3109,7 @@ swp_module_init(void){
         goto err_init_topology;
     }
     SWPS_INFO("Inventec switch-port module V.%s initial success.\n", SWP_VERSION);
+
     return 0;
 
 
@@ -3044,9 +3153,3 @@ MODULE_LICENSE(SWP_LICENSE);
 
 module_init(swp_module_init);
 module_exit(swp_module_exit);
-
-
-
-
-
-

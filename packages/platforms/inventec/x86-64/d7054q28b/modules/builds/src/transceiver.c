@@ -23,7 +23,6 @@
 #include "io_expander.h"
 #include "transceiver.h"
 
-
 /* ========== Register EEPROM address mapping ==========
  */
 struct eeprom_map_s eeprom_map_sfp = {
@@ -63,7 +62,9 @@ struct eeprom_map_s eeprom_map_sfp = {
     .addr_vendor_sn    =0x50,  .page_vendor_sn    =-1,  .offset_vendor_sn    =68,   .length_vendor_sn    =16,
     .addr_voltage      =0x51,  .page_voltage      =-1,  .offset_voltage      =98,   .length_voltage      =2,
     .addr_wavelength   =0x50,  .page_wavelength   =-1,  .offset_wavelength   =60,   .length_wavelength   =2,
+#ifdef INV_EEPROM_CACHE_SUPPORT
     .addr_eeprom       =0x50,  .page_eeprom       =-1,  .offset_eeprom       =0,    .length_eeprom       =256,
+#endif
 };
 
 struct eeprom_map_s eeprom_map_qsfp = {
@@ -103,7 +104,9 @@ struct eeprom_map_s eeprom_map_qsfp = {
     .addr_vendor_sn    =0x50,  .page_vendor_sn    =0,   .offset_vendor_sn    =196,  .length_vendor_sn    =16,
     .addr_voltage      =0x50,  .page_voltage      =-1,  .offset_voltage      =26,   .length_voltage      =2,
     .addr_wavelength   =0x50,  .page_wavelength   =0,   .offset_wavelength   =186,  .length_wavelength   =2,
+#ifdef INV_EEPROM_CACHE_SUPPORT
     .addr_eeprom       =0x50,  .page_eeprom       =0,   .offset_eeprom       =0,    .length_eeprom       =256,
+#endif
 };
 
 struct eeprom_map_s eeprom_map_qsfp28 = {
@@ -143,7 +146,9 @@ struct eeprom_map_s eeprom_map_qsfp28 = {
     .addr_vendor_sn    =0x50,  .page_vendor_sn    =0,   .offset_vendor_sn    =196,  .length_vendor_sn    =16,
     .addr_voltage      =0x50,  .page_voltage      =-1,  .offset_voltage      =26,   .length_voltage      =2,
     .addr_wavelength   =0x50,  .page_wavelength   =0,   .offset_wavelength   =186,  .length_wavelength   =2,
+#ifdef INV_EEPROM_CACHE_SUPPORT
     .addr_eeprom       =0x50,  .page_eeprom       =0,   .offset_eeprom       =0,    .length_eeprom       =256,
+#endif
 };
 
 
@@ -644,6 +649,7 @@ _common_update_attr_transvr_comp_ext(struct transvr_obj_s *self,
                                      show_err);
 }
 
+#ifdef INV_EEPROM_CACHE_SUPPORT
 static int
 _common_update_attr_eeprom(struct transvr_obj_s *self,
                        int show_err){
@@ -656,6 +662,7 @@ _common_update_attr_eeprom(struct transvr_obj_s *self,
                                      "_common_update_attr_eeprom",
                                      show_err);
 }
+#endif
 
 static int
 _common_update_attr_vendor_name(struct transvr_obj_s *self,
@@ -1437,10 +1444,12 @@ _common_update_attr_all(struct transvr_obj_s *self,
         err_str = "_common_update_attr_wavelength";
         goto err_common_update_attr_all;
     }
+#ifdef INV_EEPROM_CACHE_SUPPORT
     if (_common_update_attr_eeprom(self, show_err) < 0) {
         err_str = "_common_update_attr_eeprom";
         goto err_common_update_attr_all;
     }
+#endif
     return 0;
 
 err_common_update_attr_all:
@@ -1726,16 +1735,15 @@ common_get_connector(struct transvr_obj_s *self){
     return (int)self->connector;
 }
 
+#ifdef INV_EEPROM_CACHE_SUPPORT
 int
 common_get_eeprom(struct transvr_obj_s *self, char *buf){
 
     int err = DEBUG_TRANSVR_INT_VAL;
-    unsigned char *eeprom_update = get_eeprom_update();
 
-    if (!(eeprom_update[self->port_no/8] & (1 << self->port_no%8)) &&
-	(self->state == STATE_TRANSVR_CONNECTED &&
+    if (self->state == STATE_TRANSVR_CONNECTED &&
         self->mode == TRANSVR_MODE_POLLING &&
-        TRANSVR_INFO_CACHE_ENABLE)) {
+        TRANSVR_INFO_CACHE_ENABLE) {
         memset(buf, 0, self->eeprom_map_p->length_eeprom);
         memcpy(buf, self->eeprom, self->eeprom_map_p->length_eeprom);
         *(buf+self->eeprom_map_p->length_eeprom) = '\n';
@@ -1749,10 +1757,9 @@ common_get_eeprom(struct transvr_obj_s *self, char *buf){
     memset(buf, 0, self->eeprom_map_p->length_eeprom);
     memcpy(buf, self->eeprom, self->eeprom_map_p->length_eeprom);
     *(buf+self->eeprom_map_p->length_eeprom) = '\n';
-    eeprom_update[self->port_no/8] &= ~(1 << self->port_no%8);
-    set_eeprom_update(eeprom_update);
     return self->eeprom_map_p->length_eeprom;
 }
+#endif
 
 int
 common_get_vendor_name(struct transvr_obj_s *self, char *buf){
@@ -3898,6 +3905,21 @@ qsfp_set_rx_em(struct transvr_obj_s *self,
     return _qsfp_set_rx_em(self, input, 1);
 }
 
+static unsigned char swp_info_log_enable = 0;
+
+unsigned char
+swp_info_log_get_value(void)
+{
+    return swp_info_log_enable;
+}
+EXPORT_SYMBOL(swp_info_log_get_value);
+
+void
+swp_info_log_set_value(unsigned char value)
+{
+    swp_info_log_enable = value;
+}
+EXPORT_SYMBOL(swp_info_log_set_value);
 
 int
 common_transvr_dump(struct transvr_obj_s* self){
@@ -3905,6 +3927,9 @@ common_transvr_dump(struct transvr_obj_s* self){
     char *type_name = "Undefined";
 
     if (TRANSVR_INFO_DUMP_ENABLE != 1) {
+        return 0;
+    }
+    if (!swp_info_log_enable) {
         return 0;
     }
     switch (self->type) {
@@ -3967,6 +3992,9 @@ sfp_transvr_dump(struct transvr_obj_s* self) {
     if (TRANSVR_INFO_DUMP_ENABLE != 1) {
         return 0;
     }
+    if (!swp_info_log_enable) {
+        return 0;
+    }
     if (common_transvr_dump(self) < 0) {
         return -1;
     }
@@ -3983,6 +4011,9 @@ qsfp_transvr_dump(struct transvr_obj_s* self) {
     if (TRANSVR_INFO_DUMP_ENABLE != 1) {
         return 0;
     }
+    if (!swp_info_log_enable) {
+        return 0;
+    }
     if (common_transvr_dump(self) < 0) {
         return -1;
     }
@@ -3995,6 +4026,9 @@ qsfp_transvr_dump(struct transvr_obj_s* self) {
 int
 fake_transvr_dump(struct transvr_obj_s* self) {
 
+    if (!swp_info_log_enable) {
+        return 0;
+    }
     printk(KERN_INFO "[SWPS] Dump transceiver information: %s\n", self->swp_name);
     printk(KERN_INFO "       |- <Type>:FAKE\n");
     printk(KERN_INFO "       |- <VenderName>:FAKE_VENDER_NAME\n");
@@ -6917,7 +6951,9 @@ common_fsm_4_polling_mode(struct transvr_obj_s* self,
                    goto comfsm_action_4_disconnected;
 
                case STATE_TRANSVR_SWAPPED:       /* Case 1-4: UP -> SWAP */
-                   SWPS_INFO("Detect %s is swapped. <case>:1-4\n",self->swp_name);
+		   if (swp_info_log_enable) {
+			SWPS_INFO("Detect %s is swapped. <case>:1-4\n",self->swp_name);
+		   }
                    goto comfsm_action_4_reload_obj;
 
                case STATE_TRANSVR_UNEXCEPTED:    /* Case 1-5: UP -> UNEXPET */
@@ -6949,7 +6985,9 @@ common_fsm_4_polling_mode(struct transvr_obj_s* self,
                    goto comfsm_action_4_keep_state;
 
                case STATE_TRANSVR_SWAPPED:       /* Case 2-4: DOWN -> SWAP */
-                   SWPS_INFO("Detect %s is swapped. <case>:2-4\n",self->swp_name);
+		   if (swp_info_log_enable) {
+			SWPS_INFO("Detect %s is swapped. <case>:2-4\n",self->swp_name);
+		   }
                    goto comfsm_action_4_reload_obj;
 
                case STATE_TRANSVR_UNEXCEPTED:    /* Case 2-5: DOWN -> UNEXPET */
@@ -6988,7 +7026,9 @@ common_fsm_4_polling_mode(struct transvr_obj_s* self,
                    goto comfsm_action_4_disconnected;
 
                case STATE_TRANSVR_SWAPPED:       /* Case 3-4: UNEXPET -> SWAP */
-                   SWPS_INFO("Detect %s is swapped. <case>:3-4\n",self->swp_name);
+		   if (swp_info_log_enable) {
+			SWPS_INFO("Detect %s is swapped. <case>:3-4\n",self->swp_name);
+		   }
                    self->temp = EVENT_TRANSVR_EXCEP_SWAP;
                    goto comfsm_action_4_reload_obj;
 
@@ -7448,7 +7488,6 @@ _transvr_init_handler(struct transvr_obj_s *self){
     int retry     = 6;  /* (6+1) x 0.3 = 2.1s > spec:2.0s */
     int elimit    = 63;
     char emsg[64] = DEBUG_TRANSVR_STR_VAL;
-
     /* Clean and check callback */
     self->state = STATE_TRANSVR_INIT;
     if (self->init == NULL) {
@@ -7678,8 +7717,210 @@ int
 fake_transvr_check(struct transvr_obj_s *self){
     return 0;
 }
+/*customized functions { */
+void custom_st_reinit(struct transvr_obj_s *self)
+{
+    self->state = STATE_TRANSVR_DISCONNECTED;
+    self->prs = 0;	
+    self->wait_cnt = 0;	
 
+}
+static void custom_sfp_fsm(struct transvr_obj_s *self)
+{
+    int st = self->state;
+    int ret = 0;
+    
+    switch (st) {
 
+    case STATE_TRANSVR_INSERT:
+    {
+        ret = _is_transvr_hw_ready(self, TRANSVR_TYPE_SFP);
+        if (EVENT_TRANSVR_TASK_DONE == ret) {
+
+            self->state = STATE_TRANSVR_CONNECTED;
+            SWPS_INFO("transceiver:%s to be connected\n", self->swp_name);
+        }
+    }
+    break;
+    
+
+    case STATE_TRANSVR_CONNECTED:
+    break;
+
+    case STATE_TRANSVR_DISCONNECTED:
+
+    break;
+    case STATE_TRANSVR_NEW:
+
+    break;
+
+    default:
+    break;
+
+    }
+}
+static int custom_qsfp_cdr_control(struct transvr_obj_s *self)
+{
+    uint8_t DEFAULT_VAL_CDR = 0xff;
+    int CDR_FUNC_EXISTED = 0x3;
+    int show_err = 1;
+    int err_val = EVENT_TRANSVR_TASK_FAIL;
+    char *func_str = "custom_qsfp_cdr_control";
+
+    err_val = __qsfp_get_cdr_present(self, 0);
+    if (err_val < 0) {
+        return err_val;
+    }
+    if (err_val == CDR_FUNC_EXISTED) {
+        err_val = _common_set_uint8_attr(self,
+                                         self->eeprom_map_p->addr_cdr,
+                                         self->eeprom_map_p->addr_cdr,
+                                         self->eeprom_map_p->offset_cdr,
+                                         DEFAULT_VAL_CDR,
+                                         &(self->cdr),
+                                         func_str,
+                                         show_err);
+        if (err_val < 0) {
+            
+            SWPS_INFO("set CDR fail!\n");
+            return err_val;
+        }
+    }
+    return EVENT_TRANSVR_TASK_DONE;
+
+}    
+
+static int custom_qsfp_lpmode_control(struct transvr_obj_s *self)
+{
+    /* Handle power mode for IOEXP */
+    int ret = 0;
+    int power_class = DEBUG_TRANSVR_INT_VAL;
+	if ((ret = _common_update_attr_extended_id(self, 1)) < 0) {
+		return ret;
+	} 
+    power_class = __qsfp_get_power_cls(self, 0);
+    //SWPS_INFO("%s power_class:%d\n", self->swp_name, power_class);
+    switch (power_class) {
+        case 1: /* Case: Low power mode (Class = 1) */
+        
+        ret = self->ioexp_obj_p->set_lpmod(self->ioexp_obj_p,
+                                           self->ioexp_virt_offset,
+                                           1);
+	break;
+        case 2: /* Case: High power mode (Class > 1) */
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        ret = self->ioexp_obj_p->set_lpmod(self->ioexp_obj_p,
+                                           self->ioexp_virt_offset,
+                                           0);
+        
+        break;
+
+        default:
+        break;
+    }
+
+    return ret;
+}
+static void custom_qsfp_fsm(struct transvr_obj_s *self)
+{
+    int st = self->state;
+    int ret = 0;
+
+    switch (st) {
+
+    case STATE_TRANSVR_INSERT:
+    {
+        if (self->wait_cnt++ >= 1) {
+            
+            self->wait_cnt = 0;
+            self->state = STATE_TRANSVR_INIT;
+            
+        }
+
+    }    
+    break;
+    case STATE_TRANSVR_NEW:
+    {
+        self->wait_cnt = 0;
+
+    }
+    break;
+    
+    case STATE_TRANSVR_INIT:
+    {
+        ret = _is_transvr_hw_ready(self, TRANSVR_TYPE_QSFP);
+        
+        if (EVENT_TRANSVR_TASK_DONE != ret) {
+
+           // SWPS_INFO("transceiver:%s is not ready\n" ,self->swp_name);
+            break; 	
+        }
+        if (custom_qsfp_lpmode_control(self) < 0) {
+            SWPS_INFO("transceiver:%s lpmode fail\n" ,self->swp_name);
+            break;
+        }
+        
+        if (custom_qsfp_cdr_control(self) < 0) {
+            SWPS_INFO("transceiver:%s cdr fail\n" ,self->swp_name);
+            break;
+        }
+        self->state = STATE_TRANSVR_CONNECTED;
+        SWPS_INFO("transceiver:%s to be connected\n", self->swp_name);
+    }
+    break;
+
+    case STATE_TRANSVR_CONNECTED:
+    break;
+    case STATE_TRANSVR_DISCONNECTED:
+
+    break;
+
+    default:
+    break;
+
+    }
+}
+
+static void custom_prs_scan(struct transvr_obj_s *self)
+{
+  int prs = 0; 
+  prs = is_plugged(self);
+
+  if (prs != self->prs) {
+    
+      if (prs) {
+            
+        self->state = STATE_TRANSVR_INSERT;          
+        SWPS_INFO("transceiver:%s plug in\n" ,self->swp_name);
+
+      } else {
+
+        self->state = STATE_TRANSVR_DISCONNECTED;          
+        SWPS_INFO("transceiver:%s plug out\n" ,self->swp_name);
+      }
+
+  }  
+  self->prs = prs;  
+
+}   
+static int custom_sfp_handler(struct transvr_obj_s *self)
+{
+    custom_prs_scan(self);
+    custom_sfp_fsm(self);
+    return 0;
+}    
+static int custom_qsfp_handler(struct transvr_obj_s *self)
+{
+    custom_prs_scan(self);
+    custom_qsfp_fsm(self);
+    return 0;
+}    
+
+/*customized functions } */
 /* ========== Functions for Factory pattern ==========
  */
 static int
@@ -7688,7 +7929,9 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
     switch (transvr_type){
         case TRANSVR_TYPE_SFP:
             self->get_id              = common_get_id;
+#ifdef INV_EEPROM_CACHE_SUPPORT
             self->get_eeprom          = common_get_eeprom;
+#endif
             self->get_ext_id          = common_get_ext_id;
             self->get_connector       = common_get_connector;
             self->get_vendor_name     = common_get_vendor_name;
@@ -7742,7 +7985,9 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
         case TRANSVR_TYPE_QSFP:
         case TRANSVR_TYPE_QSFP_PLUS:
             self->get_id              = common_get_id;
+#ifdef INV_EEPROM_CACHE_SUPPORT
             self->get_eeprom          = common_get_eeprom;
+#endif
             self->get_ext_id          = common_get_ext_id;
             self->get_connector       = common_get_connector;
             self->get_vendor_name     = common_get_vendor_name;
@@ -7795,7 +8040,9 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
 
         case TRANSVR_TYPE_QSFP_28:
             self->get_id              = common_get_id;
+#ifdef INV_EEPROM_CACHE_SUPPORT
             self->get_eeprom          = common_get_eeprom;
+#endif
             self->get_ext_id          = common_get_ext_id;
             self->get_connector       = common_get_connector;
             self->get_vendor_name     = common_get_vendor_name;
@@ -7848,7 +8095,9 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
 
         case TRANSVR_TYPE_FAKE:
             self->get_id              = fake_get_hex;
+#ifdef INV_EEPROM_CACHE_SUPPORT
             self->get_eeprom          = fake_get_str;
+#endif
             self->get_ext_id          = fake_get_hex;
             self->get_connector       = fake_get_hex;
             self->get_vendor_name     = fake_get_str;
@@ -7920,6 +8169,7 @@ setup_transvr_private_cb(struct transvr_obj_s *self,
             self->fsm_4_polling = common_fsm_4_polling_mode;
             self->send_uevent = sfp_send_uevent;
             self->dump_all = sfp_transvr_dump;
+            self->custom_transvr_handler = custom_sfp_handler;
             return 0;
 
         case TRANSVR_TYPE_QSFP:
@@ -7932,6 +8182,7 @@ setup_transvr_private_cb(struct transvr_obj_s *self,
             self->fsm_4_polling = common_fsm_4_polling_mode;
             self->send_uevent = qsfp_send_uevent;
             self->dump_all = qsfp_transvr_dump;
+            self->custom_transvr_handler = custom_qsfp_handler;
             return 0;
 
         case TRANSVR_TYPE_QSFP_28:
@@ -7943,6 +8194,7 @@ setup_transvr_private_cb(struct transvr_obj_s *self,
             self->fsm_4_polling = common_fsm_4_polling_mode;
             self->send_uevent = qsfp_send_uevent;
             self->dump_all = qsfp_transvr_dump;
+            self->custom_transvr_handler = custom_qsfp_handler;
             return 0;
 
         case TRANSVR_TYPE_FAKE:
@@ -8015,6 +8267,8 @@ setup_transvr_ssize_attr(char *swp_name,
     self->state             = STATE_TRANSVR_NEW;
     self->info              = STATE_TRANSVR_NEW;
     self->auto_tx_disable   = VAL_TRANSVR_FUNCTION_DISABLE;
+    self->prs = 0;
+    self->wait_cnt = 0;
     strncpy(self->swp_name, swp_name, 32);
     mutex_init(&self->lock);
     return 0;

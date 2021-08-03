@@ -34,6 +34,7 @@ class OnlPlatform_x86_64_inventec_d5264q28b_r0(OnlPlatformInventec,
         self.insmod('swps')
         self.insmod('inv_eeprom')
         self.new_i2c_device('inv_eeprom', 0x53, 0)
+        self.insmod('vpd')
 
         os.system("/lib/platform-config/x86-64-inventec-d5264q28b-r0/onl/healthstatus.sh &")
 
