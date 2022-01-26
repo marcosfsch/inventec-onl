@@ -272,7 +272,9 @@ static u16 psoc_read16(struct i2c_client *client, u16 offset)
 	u8 buf[2];
     
     if(psoc_i2c_read(client, buf, offset, 2) == 2)
+    {
         value = (buf[0]<<8 | buf[1]<<0);
+    }
     
 	return value;
 }
@@ -283,7 +285,9 @@ static u8 psoc_read8(struct i2c_client *client, u16 offset)
 	u8 buf = 0;
     
     if(psoc_i2c_read(client, &buf, offset, 1) == 1)
+    {
         value = buf;
+    }
     
 	return value;
 }

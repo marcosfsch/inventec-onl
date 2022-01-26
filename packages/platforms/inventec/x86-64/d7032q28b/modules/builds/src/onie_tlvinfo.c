@@ -617,9 +617,13 @@ bool tlvinfo_add_tlv(u_int8_t * eeprom, int tcode, char * strval)
 	strncpy(data, strval, MAX_TLV_VALUE_LEN);
 
 	if( strlen(strval) >= MAX_TLV_VALUE_LEN )
-        new_tlv_len = MAX_TLV_VALUE_LEN;
-    else
-        new_tlv_len = strlen(strval);
+        {
+            new_tlv_len = MAX_TLV_VALUE_LEN;
+        }
+        else
+        {
+            new_tlv_len = strlen(strval);
+        }
 
 	break;
     case TLV_CODE_DEVICE_VERSION:

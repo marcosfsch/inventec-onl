@@ -1366,7 +1366,7 @@ static int cpld_io_intr_enable(struct cpld_io_t *cpld_io)
 
     if (!p_valid(cpld_client = cpld_client_find(cpld_io,
                                cpld_io->config->i2c_config[cpld_id].ch_id,
-                               cpld_io->config->i2c_config[cpld_id].addr)) < 0) {
+                               cpld_io->config->i2c_config[cpld_id].addr))) {
         return -EBADRQC;
     }
     mutex_lock(&cpld_client->lock);
@@ -1393,7 +1393,7 @@ static int cpld_io_intr_st_get_type1(struct cpld_io_t *cpld_io, u32 *reg)
 
     if (!p_valid(cpld_client = cpld_client_find(cpld_io,
                                cpld_io->config->i2c_config[cpld_id].ch_id,
-                               cpld_io->config->i2c_config[cpld_id].addr)) < 0) {
+                               cpld_io->config->i2c_config[cpld_id].addr))) {
         return -EBADRQC;
     }
     mutex_lock(&cpld_client->lock);
@@ -1427,7 +1427,7 @@ static int cpld_io_intr_st_get_type2(struct cpld_io_t *cpld_io, u32 *reg)
 
     if (!p_valid(cpld_client = cpld_client_find(cpld_io,
                                cpld_io->config->i2c_config[cpld_id].ch_id,
-                               cpld_io->config->i2c_config[cpld_id].addr)) < 0) {
+                               cpld_io->config->i2c_config[cpld_id].addr))) {
         return -EBADRQC;
     }
     mutex_lock(&cpld_client->lock);

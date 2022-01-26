@@ -296,7 +296,9 @@ static u16 psoc_read16(u8 offset)
 	u8 buf[]={0,0};
     
     if(psoc_ipmi_read(buf, offset, 2) == 2)
+    {
         value = (buf[0]<<8 | buf[1]<<0);
+    }
     
 	return value;
 }
@@ -307,7 +309,9 @@ static u8 psoc_read8(u8 offset)
 	u8 buf = 0;
     
     if(psoc_ipmi_read(&buf, offset, 1) == 1)
+    {
         value = buf;
+    }
     
 	return value;
 }
