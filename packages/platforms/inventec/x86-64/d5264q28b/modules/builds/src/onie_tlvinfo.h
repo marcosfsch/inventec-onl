@@ -5,8 +5,12 @@
 #include <linux/types.h>
 #define strtoul simple_strtoul
 
+#ifndef FALSE
 #define FALSE   0
+#endif
+#ifndef TRUE
 #define TRUE    (!FALSE)
+#endif
 #define MAX_STRING_SIZE	128
 /*
  * Tlvinf header: Layout of the header for the TlvInfo format
