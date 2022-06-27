@@ -282,7 +282,7 @@ static int __init plat_lavender_x86_init(void)
     
         i2c_put_adapter(adap);
         for(j=0; j<i2cdev_list[i].size; j++) {
-            e = i2c_new_device(adap, &i2cdev_list[i].board_info[j] );
+            e = i2c_new_client_device(adap, &i2cdev_list[i].board_info[j] );
         }
     }
 
