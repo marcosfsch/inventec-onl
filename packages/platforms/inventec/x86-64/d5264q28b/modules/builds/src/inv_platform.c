@@ -11,7 +11,7 @@
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,1,0)
 #include "pca954x.h"
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0)
 #include <linux/platform_data/pca954x.h>

@@ -21,7 +21,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-
 #ifndef _LINUX_I2C_PCA954X_H
 #define _LINUX_I2C_PCA954X_H
 
@@ -34,15 +33,15 @@
  *
  */
 struct pca954x_platform_mode {
-intadap_id;
-unsigned intdeselect_on_exit:1;
-unsigned intclass;
+        int             adap_id;
+        unsigned int    deselect_on_exit:1;
+        unsigned int    class;
 };
 
 /* Per mux/switch data, used with i2c_register_board_info */
 struct pca954x_platform_data {
-struct pca954x_platform_mode *modes;
-int num_modes;
+        struct pca954x_platform_mode *modes;
+        int num_modes;
 };
 
 #endif /* _LINUX_I2C_PCA954X_H */
