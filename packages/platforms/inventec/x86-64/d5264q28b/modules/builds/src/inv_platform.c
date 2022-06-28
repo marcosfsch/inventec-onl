@@ -282,7 +282,11 @@ static int __init plat_lavender_x86_init(void)
     
         i2c_put_adapter(adap);
         for(j=0; j<i2cdev_list[i].size; j++) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,3,0)
             e = i2c_new_client_device(adap, &i2cdev_list[i].board_info[j] );
+#else
+            e = i2c_new_device(adap, &i2cdev_list[i].board_info[j] );
+#endif
         }
     }
 
